@@ -17,9 +17,11 @@ body {
 }
 
 .stack {
-    display: grid;
+/*    display: grid;
     grid-template-columns: 1fr;
+*/    
     gap: 1rem;
+    width: 100%;
 }
 
 .summary-card {
