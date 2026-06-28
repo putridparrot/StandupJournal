@@ -1,0 +1,46 @@
+@page "/history"
+@inject IStandupJournalService JournalService
+
+<PageTitle>History</PageTitle>
+
+<FluentCard>
+    <div class="history-header">
+        <FluentLabel Typography="Typography.Title3">Entry History</FluentLabel>
+        <FluentButton Appearance="Appearance.Neutral" @onclick="RefreshAsync">Refresh</FluentButton>
+    </div>
+
+    @if (_entries.Count == 0)
+    {
+        <FluentLabel class="muted-text">No saved entries yet.</FluentLabel>
+    }
+    else
+    {
+        <ul class="history-list">
+            @foreach (var entry in _entries)
+            {
+                <li class="history-item">
+                    <FluentLabel Typography="Typography.Subtitle2">@entry.Date.ToString("dddd, dd MMM yyyy")</FluentLabel>
+                    <div class="history-meta">Updated @entry.UpdatedAtUtc.ToLocalTime().ToString("g")</div>
+                    <p class="history-text"><strong>Yesterday:</strong> @entry.Yesterday</p>
+                    <p class="history-text"><strong>Today:</strong> @entry.Today</p>
+                    <p class="history-text"><strong>Blockers:</strong> @entry.Blockers</p>
+                    <p class="history-text"><strong>Notes:</strong> @entry.Notes</p>
+                </li>
+            }
+        </ul>
+    }
+</FluentCard>
+
+@code {
+    private IReadOnlyList<StandupEntry> _entries = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        _entries = await JournalService.GetRecentEntriesAsync(60);
+    }
+}

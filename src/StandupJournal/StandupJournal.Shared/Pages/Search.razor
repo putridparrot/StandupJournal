@@ -1,0 +1,78 @@
+@page "/search"
+@inject IStandupJournalService JournalService
+
+<PageTitle>Search</PageTitle>
+
+<FluentCard class="panel-card">
+    <FluentLabel Typography="Typography.Title3">Search entries</FluentLabel>
+    <FluentTextField Label="Keyword" Placeholder="Search by text, blocker, or note" @bind-Value="_query" @oninput="OnSearchChanged" />
+
+    @if (string.IsNullOrWhiteSpace(_query))
+    {
+        <FluentLabel class="muted-text">Enter a keyword to search recent entries.</FluentLabel>
+    }
+    else if (_results.Count == 0)
+    {
+        <FluentLabel class="muted-text">No entries match your search.</FluentLabel>
+    }
+    else
+    {
+        <ul class="history-list">
+            @foreach (var entry in _results)
+            {
+                <li class="history-item">
+                    <FluentLabel Typography="Typography.Subtitle2">@entry.Date.ToString("dddd, dd MMM yyyy")</FluentLabel>
+                    <div class="history-meta">Updated @entry.UpdatedAtUtc.ToLocalTime().ToString("g")</div>
+                    <p class="history-text"><strong>Today:</strong> @entry.Today</p>
+                    <p class="history-text"><strong>Blockers:</strong> @entry.Blockers</p>
+                    <p class="history-text"><strong>Notes:</strong> @entry.Notes</p>
+                </li>
+            }
+        </ul>
+    }
+</FluentCard>
+
+@code {
+    private IReadOnlyList<StandupEntry> _entries = [];
+    private IReadOnlyList<StandupEntry> _results = [];
+    private string? _query;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _entries = await JournalService.GetRecentEntriesAsync(180);
+    }
+
+    private void OnSearchChanged(ChangeEventArgs args)
+    {
+        _query = args.Value?.ToString();
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (string.IsNullOrWhiteSpace(_query))
+        {
+            _results = [];
+            return;
+        }
+
+        _results = _entries
+            .Where(entry => Matches(entry, _query))
+            .OrderByDescending(entry => entry.Date)
+            .ToList();
+    }
+
+    private static bool Matches(StandupEntry entry, string query)
+    {
+        return Contains(entry.Yesterday, query)
+            || Contains(entry.Today, query)
+            || Contains(entry.Blockers, query)
+            || Contains(entry.Notes, query);
+    }
+
+    private static bool Contains(string? value, string query)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && value.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+}

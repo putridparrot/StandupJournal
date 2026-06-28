@@ -1,0 +1,98 @@
+.shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--app-bg);
+}
+
+.sidebar {
+    border-right: 1px solid var(--neutral-stroke-rest);
+    background: var(--app-surface);
+}
+
+.content-shell {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.top-row {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--neutral-stroke-rest);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--app-surface);
+}
+
+.top-row-title {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.theme-icon-button {
+    min-width: 2.25rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.hint-text {
+    color: var(--neutral-foreground-hint);
+}
+
+.content-area {
+    padding: 1.25rem;
+}
+
+@media (min-width: 880px) {
+    .shell {
+        flex-direction: row;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    .sidebar {
+        width: 220px;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex-shrink: 0;
+    }
+
+    .content-shell {
+        min-width: 0;
+        height: 100vh;
+    }
+
+    .content-area {
+        overflow-y: auto;
+    }
+}
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }

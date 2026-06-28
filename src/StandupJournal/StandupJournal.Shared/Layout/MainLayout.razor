@@ -1,0 +1,80 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject IJSRuntime JS
+@inject StandupJournal.Shared.Services.ThemeService AppThemeService
+
+<FluentDesignTheme Mode="@_themeMode" />
+
+<div class="shell">
+    <aside class="sidebar">
+        <NavMenu />
+    </aside>
+
+    <main class="content-shell">
+        <header class="top-row">
+            <div class="top-row-title">
+                <FluentLabel Typography="Typography.PaneHeader">Standup Journal</FluentLabel>
+                <FluentLabel class="hint-text">Daily status tracking</FluentLabel>
+            </div>
+            <FluentButton class="theme-icon-button"
+                          Appearance="Appearance.Neutral"
+                          Title="@ThemeButtonLabel"
+                          AriaLabel="@ThemeButtonLabel"
+                          @onclick="ToggleTheme">@ThemeIcon</FluentButton>
+        </header>
+
+        <article class="content-area">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private DesignThemeModes _themeMode = DesignThemeModes.System;
+
+    protected override void OnInitialized()
+    {
+        AppThemeService.ThemeChanged += HandleThemeChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AppThemeService.EnsureLoadedAsync(JS);
+    }
+
+    private async Task ToggleTheme()
+    {
+        await AppThemeService.CycleModeAsync(JS);
+    }
+
+    private void HandleThemeChanged()
+    {
+        _themeMode = AppThemeService.Mode;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private string ThemeIcon => AppThemeService.Mode switch
+    {
+        DesignThemeModes.Light => "☀",
+        DesignThemeModes.Dark => "☾",
+        _ => "◐"
+    };
+
+    private string ThemeButtonLabel => $"Theme: {AppThemeService.ModeLabel}";
+
+    public void Dispose()
+    {
+        AppThemeService.ThemeChanged -= HandleThemeChanged;
+    }
+}
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

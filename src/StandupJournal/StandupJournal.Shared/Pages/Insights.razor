@@ -1,0 +1,95 @@
+@page "/insights"
+@inject IStandupJournalService JournalService
+
+<PageTitle>Insights</PageTitle>
+
+<div class="stack insights-stack">
+    <FluentCard class="summary-card">
+        <div class="summary-grid insights-grid">
+            <div class="summary-item">
+                <FluentLabel class="summary-label">Entries in scope</FluentLabel>
+                <FluentLabel Typography="Typography.Title3">@_entries.Count</FluentLabel>
+            </div>
+            <div class="summary-item">
+                <FluentLabel class="summary-label">Entries with blockers</FluentLabel>
+                <FluentLabel Typography="Typography.Title3">@_blockerCount</FluentLabel>
+            </div>
+            <div class="summary-item">
+                <FluentLabel class="summary-label">Most used tag</FluentLabel>
+                <FluentLabel Typography="Typography.Title3">@(_topTag ?? "None")</FluentLabel>
+            </div>
+        </div>
+    </FluentCard>
+
+    <FluentCard class="panel-card">
+        <FluentLabel Typography="Typography.Title3">Common blocker keywords</FluentLabel>
+
+        @if (_topBlockers.Count == 0)
+        {
+            <FluentLabel class="muted-text">No blocker trends found yet.</FluentLabel>
+        }
+        else
+        {
+            <ul class="entry-list">
+                @foreach (var blocker in _topBlockers)
+                {
+                    <li class="history-item">@blocker.Term (@blocker.Count)</li>
+                }
+            </ul>
+        }
+    </FluentCard>
+</div>
+
+@code {
+    private IReadOnlyList<StandupEntry> _entries = [];
+    private int _blockerCount;
+    private string? _topTag;
+    private IReadOnlyList<(string Term, int Count)> _topBlockers = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _entries = await JournalService.GetRecentEntriesAsync(180);
+
+        _blockerCount = _entries.Count(entry => !string.IsNullOrWhiteSpace(entry.Blockers));
+        _topTag = _entries
+            .SelectMany(entry => ExtractTags(entry.Notes))
+            .GroupBy(tag => tag)
+            .OrderByDescending(group => group.Count())
+            .Select(group => group.Key)
+            .FirstOrDefault();
+
+        _topBlockers = _entries
+            .SelectMany(entry => SplitWords(entry.Blockers))
+            .GroupBy(term => term)
+            .Select(group => (Term: group.Key, Count: group.Count()))
+            .OrderByDescending(item => item.Count)
+            .ThenBy(item => item.Term)
+            .Take(5)
+            .ToList();
+    }
+
+    private static IEnumerable<string> ExtractTags(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            return [];
+        }
+
+        return notes.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(word => word.StartsWith('#') && word.Length > 1)
+            .Select(word => word.Trim().TrimEnd(',', '.', ';', ':', '!', '?').ToLowerInvariant());
+    }
+
+    private static IEnumerable<string> SplitWords(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [];
+        }
+
+        return text.Split(new[] { ' ', ',', '.', ';', ':', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(word => word.Trim().ToLowerInvariant())
+            .Where(word => word.Length > 3)
+            .Where(word => word is not "with" and not "from" and not "that" and not "this");
+    }
+}

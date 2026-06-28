@@ -1,0 +1,36 @@
+.brand {
+    padding: 1rem 1rem 0.875rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--app-text);
+    border-bottom: 1px solid var(--app-border-subtle);
+    margin-bottom: 0.25rem;
+}
+
+.nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 1rem 0.5rem 1rem;
+}
+
+.nav-list ::deep .nav-link {
+    border-radius: 0.25rem;
+    padding: 0.5rem 0.65rem;
+    color: var(--app-text);
+    text-decoration: none;
+    font-size: 0.9rem;
+    border: 1px solid transparent;
+}
+
+.nav-list ::deep .nav-link.active {
+    background: var(--app-subtle);
+    border-color: var(--app-border);
+    color: var(--app-text);
+    font-weight: 600;
+}
+
+.nav-list ::deep .nav-link:hover {
+    background: var(--app-subtle);
+}

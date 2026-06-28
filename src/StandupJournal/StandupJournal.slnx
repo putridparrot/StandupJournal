@@ -1,0 +1,19 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="StandupJournal.Core/StandupJournal.Core.csproj" />
+  <Project Path="StandupJournal.Infrastructure.Sqlite/StandupJournal.Infrastructure.Sqlite.csproj" />
+  <Project Path="StandupJournal.Shared/StandupJournal.Shared.csproj" />
+  <Project Path="StandupJournal.Web.Client/StandupJournal.Web.Client.csproj">
+    <Deploy Solution="*|Any CPU" />
+  </Project>
+  <Project Path="StandupJournal.Web/StandupJournal.Web.csproj">
+    <Deploy Solution="*|Any CPU" />
+  </Project>
+  <Project Path="StandupJournal/StandupJournal.csproj">
+    <Deploy Solution="*|Any CPU" />
+  </Project>
+</Solution>

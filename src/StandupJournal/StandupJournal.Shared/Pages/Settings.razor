@@ -1,0 +1,79 @@
+@page "/settings"
+@inject IJSRuntime JS
+@inject StandupJournal.Shared.Services.ThemeService AppThemeService
+@inject StandupJournal.Shared.Services.AppPreferencesService AppPreferences
+
+<PageTitle>Settings</PageTitle>
+
+<FluentCard class="panel-card">
+    <FluentLabel Typography="Typography.Title3">Settings</FluentLabel>
+    <FluentLabel class="muted-text">This section is reserved for future configuration options.</FluentLabel>
+
+    <div class="settings-grid">
+        <div class="summary-item">
+            <FluentLabel class="summary-label">Theme</FluentLabel>
+            <div class="action-row">
+                <FluentButton Appearance="@(AppThemeService.Mode == DesignThemeModes.System ? Appearance.Accent : Appearance.Neutral)" @onclick="() => SetThemeAsync(DesignThemeModes.System)">System</FluentButton>
+                <FluentButton Appearance="@(AppThemeService.Mode == DesignThemeModes.Light ? Appearance.Accent : Appearance.Neutral)" @onclick="() => SetThemeAsync(DesignThemeModes.Light)">Light</FluentButton>
+                <FluentButton Appearance="@(AppThemeService.Mode == DesignThemeModes.Dark ? Appearance.Accent : Appearance.Neutral)" @onclick="() => SetThemeAsync(DesignThemeModes.Dark)">Dark</FluentButton>
+            </div>
+        </div>
+@*         <div class="summary-item">
+            <FluentLabel class="summary-label">Sync profile</FluentLabel>
+            <FluentLabel>Default</FluentLabel>
+        </div>
+ *@        <div class="summary-item">
+            <FluentLabel class="summary-label">Auto-save</FluentLabel>
+            <FluentSwitch @onchange="OnAutoSaveChangedAsync" @ref="_switchRef"
+                          AriaLabel="Enable or disable auto-save">
+                @AutoSaveLabel
+            </FluentSwitch>
+        </div>
+        <div class="summary-item">
+            <FluentLabel class="summary-label">Database location</FluentLabel>
+            <FluentLabel class="muted-text">@AppPreferences.DatabaseLocation</FluentLabel>
+        </div>
+@*         <div class="summary-item">
+            <FluentLabel class="summary-label">Retention window</FluentLabel>
+            <FluentLabel>Recent 180 days</FluentLabel>
+        </div>
+ *@    </div>
+</FluentCard>
+
+@code {
+    private FluentSwitch _switchRef;
+    private bool _autoSaveEnabled = true;
+
+    protected override Task OnInitializedAsync()
+    {
+        _autoSaveEnabled = AppPreferences.AutoSaveEnabled;
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AppThemeService.EnsureLoadedAsync(JS);
+        await AppPreferences.EnsureLoadedAsync(JS);
+        _autoSaveEnabled = AppPreferences.AutoSaveEnabled;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private string AutoSaveLabel => _autoSaveEnabled ? "Enabled" : "Disabled";
+
+    private async Task SetThemeAsync(DesignThemeModes mode)
+    {
+        await AppThemeService.SetModeAsync(mode, JS);
+    }
+
+    private async Task OnAutoSaveChangedAsync()
+    {
+        _autoSaveEnabled = !_switchRef.Value;
+
+        await AppPreferences.SetAutoSaveEnabledAsync(_autoSaveEnabled, JS);
+    }
+}

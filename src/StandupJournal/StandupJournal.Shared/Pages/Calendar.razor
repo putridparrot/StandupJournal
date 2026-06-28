@@ -1,0 +1,63 @@
+@page "/calendar"
+@inject IStandupJournalService JournalService
+
+<PageTitle>Calendar</PageTitle>
+
+<FluentCard class="panel-card">
+    <div class="history-header">
+        <FluentLabel Typography="Typography.Title3">Browse by date</FluentLabel>
+        <FluentButton Appearance="Appearance.Neutral" @onclick="LoadEntriesAsync">Refresh</FluentButton>
+    </div>
+
+    <label for="calendarDate" class="summary-label">Date</label>
+    <InputDate id="calendarDate" class="form-control" @bind-Value="SelectedDate" />
+
+    @if (_selectedEntry is null)
+    {
+        <FluentLabel class="muted-text">No entry found for the selected date.</FluentLabel>
+    }
+    else
+    {
+        <div class="history-item">
+            <FluentLabel Typography="Typography.Subtitle2">@_selectedEntry.Date.ToString("dddd, dd MMM yyyy")</FluentLabel>
+            <div class="history-meta">Updated @_selectedEntry.UpdatedAtUtc.ToLocalTime().ToString("g")</div>
+            <p class="history-text"><strong>Yesterday:</strong> @_selectedEntry.Yesterday</p>
+            <p class="history-text"><strong>Today:</strong> @_selectedEntry.Today</p>
+            <p class="history-text"><strong>Blockers:</strong> @_selectedEntry.Blockers</p>
+            <p class="history-text"><strong>Notes:</strong> @_selectedEntry.Notes</p>
+        </div>
+    }
+</FluentCard>
+
+@code {
+    private IReadOnlyList<StandupEntry> _entries = [];
+    private DateTime _selectedDate = DateTime.Today;
+    private StandupEntry? _selectedEntry;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEntriesAsync();
+    }
+
+    private async Task LoadEntriesAsync()
+    {
+        _entries = await JournalService.GetRecentEntriesAsync(180);
+        ResolveSelection();
+    }
+
+    private void ResolveSelection()
+    {
+        var selectedDate = DateOnly.FromDateTime(_selectedDate.Date);
+        _selectedEntry = _entries.FirstOrDefault(entry => entry.Date == selectedDate);
+    }
+
+    private DateTime SelectedDate
+    {
+        get => _selectedDate;
+        set
+        {
+            _selectedDate = value;
+            ResolveSelection();
+        }
+    }
+}

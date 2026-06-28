@@ -1,0 +1,386 @@
+﻿@page "/"
+@implements IDisposable
+@inject IJSRuntime JS
+@inject IStandupJournalService JournalService
+@inject StandupJournal.Shared.Services.AppPreferencesService AppPreferences
+
+<PageTitle>Today</PageTitle>
+
+<div class="stack" >
+    <FluentCard class="editor-card">
+        <FluentLabel Typography="Typography.Title2">@_activeEntry.Date.ToString("dddd, MMM dd yyyy")</FluentLabel>
+
+        <div class="summary-item">
+            <FluentLabel class="summary-label">Yesterday’s carryovers</FluentLabel>
+            @if (string.IsNullOrWhiteSpace(_carryovers))
+            {
+                <FluentLabel class="muted-text">No carryovers from yesterday.</FluentLabel>
+            }
+            else
+            {
+                <p class="history-text">@_carryovers</p>
+            }
+        </div>
+
+        <div class="editor-grid">
+            <FluentTextArea Label="What I did yesterday" Rows="4" Value="@_activeEntry.Yesterday" ValueChanged="OnYesterdayChangedAsync" />
+            <FluentTextArea Label="What I plan to do today" Rows="4" Value="@_activeEntry.Today" ValueChanged="OnTodayChangedAsync" />
+            <FluentTextArea Label="Blockers" Rows="3" Value="@_activeEntry.Blockers" ValueChanged="OnBlockersChangedAsync" />
+            <FluentTextArea Label="Notes (optional)" Rows="3" Value="@_activeEntry.Notes" ValueChanged="OnNotesChangedAsync" />
+        </div>
+
+        @if (!_autoSaveEnabled)
+        {
+            <div class="action-row">
+                <FluentButton Appearance="Appearance.Accent" @onclick="SaveEntryAsync">Save Entry</FluentButton>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_statusMessage))
+        {
+            <FluentLabel class="status-text">@_statusMessage</FluentLabel>
+        }
+    </FluentCard>
+
+@*     <FluentCard class="panel-card context-pane">
+        <FluentLabel Typography="Typography.Title3">Context</FluentLabel>
+
+        <div class="summary-item">
+            <FluentLabel class="summary-label">Quick history (last 7 days)</FluentLabel>
+            @if (_lastSevenDays.Count == 0)
+            {
+                <FluentLabel class="muted-text">No entries in the past week.</FluentLabel>
+            }
+            else
+            {
+                <ul class="history-list compact-list">
+                    @foreach (var entry in _lastSevenDays)
+                    {
+                        <li class="history-item compact-item">
+                            <strong>@entry.Date.ToString("ddd dd MMM")</strong>
+                            <div class="entry-preview">@BuildPreview(entry)</div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <div class="summary-item">
+            <FluentLabel class="summary-label">Tags</FluentLabel>
+            @if (_tags.Count == 0)
+            {
+                <FluentLabel class="muted-text">No tags yet. Use #tag in notes.</FluentLabel>
+            }
+            else
+            {
+                <div class="tag-list">
+                    @foreach (var tag in _tags)
+                    {
+                        <span class="tag-chip">@tag</span>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="summary-item">
+            <FluentLabel class="summary-label">Mood</FluentLabel>
+            <input type="range" min="1" max="5" step="1" @bind="_mood" class="mood-slider" />
+            <FluentLabel class="muted-text">@MoodLabel</FluentLabel>
+        </div>
+
+        <div class="summary-item">
+            <FluentLabel class="summary-label">What you said you’d do today (yesterday)</FluentLabel>
+            <p class="history-text">@(_yesterdayPlan ?? "No plan captured yesterday.")</p>
+        </div>
+
+        <div class="summary-item">
+            <FluentLabel class="summary-label">Suggestions</FluentLabel>
+            <ul class="history-list compact-list">
+                @foreach (var suggestion in _suggestions)
+                {
+                    <li class="history-item compact-item">@suggestion</li>
+                }
+            </ul>
+        </div>
+    </FluentCard>
+ *@</div>
+
+@code {
+    private StandupEntry _activeEntry = new();
+    private IReadOnlyList<StandupEntry> _recentEntries = [];
+    private IReadOnlyList<StandupEntry> _lastSevenDays = [];
+    private IReadOnlyList<string> _tags = [];
+    private IReadOnlyList<string> _suggestions = [];
+    private CancellationTokenSource? _autosaveCts;
+    private string? _yesterdayPlan;
+    private string? _carryovers;
+    private string? _statusMessage;
+    private bool _autoSaveEnabled = true;
+    private int _mood = 3;
+
+    private string MoodLabel => _mood switch
+    {
+        1 => "Low",
+        2 => "Below average",
+        3 => "Neutral",
+        4 => "Good",
+        5 => "Great",
+        _ => "Neutral"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppPreferences.PreferencesChanged += OnPreferencesChanged;
+        _recentEntries = await JournalService.GetRecentEntriesAsync(30);
+        await LoadTodayAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AppPreferences.EnsureLoadedAsync(JS);
+        _autoSaveEnabled = AppPreferences.AutoSaveEnabled;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadTodayAsync()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var yesterday = today.AddDays(-1);
+        _activeEntry = await JournalService.GetOrCreateEntryForDateAsync(today);
+
+        var yesterdayEntry = _recentEntries.FirstOrDefault(entry => entry.Date == yesterday);
+        _yesterdayPlan = yesterdayEntry?.Today;
+        _carryovers = BuildCarryovers(yesterdayEntry);
+        if (string.IsNullOrWhiteSpace(_activeEntry.Yesterday) && !string.IsNullOrWhiteSpace(_carryovers))
+        {
+            _activeEntry.Yesterday = _carryovers;
+        }
+
+        RefreshContextPane();
+        _statusMessage = null;
+    }
+
+    private async Task SaveEntryAsync()
+    {
+        await PersistEntryAsync(isAutoSave: false);
+    }
+
+    private Task OnYesterdayChangedAsync(string? value)
+    {
+        _activeEntry.Yesterday = value;
+        QueueAutoSave();
+        return Task.CompletedTask;
+    }
+
+    private Task OnTodayChangedAsync(string? value)
+    {
+        _activeEntry.Today = value;
+        QueueAutoSave();
+        return Task.CompletedTask;
+    }
+
+    private Task OnBlockersChangedAsync(string? value)
+    {
+        _activeEntry.Blockers = value;
+        QueueAutoSave();
+        return Task.CompletedTask;
+    }
+
+    private Task OnNotesChangedAsync(string? value)
+    {
+        _activeEntry.Notes = value;
+        QueueAutoSave();
+        return Task.CompletedTask;
+    }
+
+    private void QueueAutoSave()
+    {
+        if (!_autoSaveEnabled)
+        {
+            return;
+        }
+
+        _autosaveCts?.Cancel();
+        _autosaveCts?.Dispose();
+
+        _autosaveCts = new CancellationTokenSource();
+        _ = AutoSaveAfterDelayAsync(_autosaveCts.Token);
+    }
+
+    private async Task AutoSaveAfterDelayAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(1200, cancellationToken);
+            await PersistEntryAsync(isAutoSave: true);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when user keeps typing.
+        }
+    }
+
+    private async Task PersistEntryAsync(bool isAutoSave)
+    {
+        await JournalService.SaveAsync(_activeEntry);
+        _statusMessage = isAutoSave
+            ? $"Auto-saved at {DateTime.Now:t}"
+            : $"Saved at {DateTime.Now:t}";
+
+        UpsertEntry(_activeEntry);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void UpsertEntry(StandupEntry entry)
+    {
+        var updated = _recentEntries.ToList();
+        var index = updated.FindIndex(item => item.Id == entry.Id || item.Date == entry.Date);
+
+        var snapshot = new StandupEntry
+        {
+            Id = entry.Id,
+            Date = entry.Date,
+            Yesterday = entry.Yesterday,
+            Today = entry.Today,
+            Blockers = entry.Blockers,
+            Notes = entry.Notes,
+            UpdatedAtUtc = entry.UpdatedAtUtc
+        };
+
+        if (index >= 0)
+        {
+            updated[index] = snapshot;
+        }
+        else
+        {
+            updated.Add(snapshot);
+        }
+
+        _recentEntries = updated
+            .OrderByDescending(item => item.Date)
+            .Take(30)
+            .ToList();
+
+        RefreshContextPane();
+    }
+
+    private void RefreshContextPane()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var start = today.AddDays(-6);
+
+        _lastSevenDays = _recentEntries
+            .Where(entry => entry.Date >= start && entry.Date <= today)
+            .OrderByDescending(entry => entry.Date)
+            .ToList();
+
+        _tags = _recentEntries
+            .Take(14)
+            .SelectMany(entry => ExtractTags(entry.Notes))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(tag => tag)
+            .Take(10)
+            .ToList();
+
+        _suggestions = BuildSuggestions().ToList();
+    }
+
+    private IEnumerable<string> BuildSuggestions()
+    {
+        var yesterday = DateOnly.FromDateTime(DateTime.Now).AddDays(-1);
+        var yesterdayEntry = _recentEntries.FirstOrDefault(entry => entry.Date == yesterday);
+
+        if (yesterdayEntry is null)
+        {
+            yield return "Add daily updates to unlock tailored suggestions.";
+            yield break;
+        }
+
+        if (!string.IsNullOrWhiteSpace(yesterdayEntry.Blockers) && string.IsNullOrWhiteSpace(_activeEntry.Blockers))
+        {
+            yield return "You had a blocker yesterday — resolved?";
+        }
+
+        if (!string.IsNullOrWhiteSpace(yesterdayEntry.Today) && string.IsNullOrWhiteSpace(_activeEntry.Yesterday))
+        {
+            yield return "You planned work yesterday. Capture what was completed in 'What I did yesterday'.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_activeEntry.Today))
+        {
+            yield return "Add at least one concrete plan for today.";
+        }
+
+        if (_mood <= 2)
+        {
+            yield return "Mood is low — consider adding a note on support needed.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_activeEntry.Notes))
+        {
+            yield return "Optional: add notes with #tags to improve insights.";
+        }
+    }
+
+    private static IEnumerable<string> ExtractTags(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+        {
+            return [];
+        }
+
+        return notes.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(word => word.StartsWith('#') && word.Length > 1)
+            .Select(word => word.Trim().TrimEnd(',', '.', ';', ':', '!', '?'));
+    }
+
+    private static string BuildPreview(StandupEntry entry)
+    {
+        var text = string.IsNullOrWhiteSpace(entry.Today) ? entry.Yesterday : entry.Today;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "No content yet";
+        }
+
+        return text.Length <= 48 ? text : $"{text[..45]}...";
+    }
+
+    private static string? BuildCarryovers(StandupEntry? yesterdayEntry)
+    {
+        if (yesterdayEntry is null)
+        {
+            return null;
+        }
+
+        var carryovers = new List<string>();
+        if (!string.IsNullOrWhiteSpace(yesterdayEntry.Today))
+        {
+            carryovers.Add(yesterdayEntry.Today.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(yesterdayEntry.Blockers))
+        {
+            carryovers.Add($"Blockers to revisit: {yesterdayEntry.Blockers.Trim()}");
+        }
+
+        return carryovers.Count == 0 ? null : string.Join(Environment.NewLine, carryovers);
+    }
+
+    public void Dispose()
+    {
+        AppPreferences.PreferencesChanged -= OnPreferencesChanged;
+        _autosaveCts?.Cancel();
+        _autosaveCts?.Dispose();
+    }
+
+    private void OnPreferencesChanged()
+    {
+        _autoSaveEnabled = AppPreferences.AutoSaveEnabled;
+        _ = InvokeAsync(StateHasChanged);
+    }
+}
