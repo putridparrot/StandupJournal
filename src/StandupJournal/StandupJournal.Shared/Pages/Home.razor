@@ -3,9 +3,11 @@
 @inject IJSRuntime JS
 @inject IStandupJournalService JournalService
 @inject StandupJournal.Shared.Services.AppPreferencesService AppPreferences
+@inject IDialogService DialogService
+
+<FluentDialogProvider />
 
 <PageTitle>Today</PageTitle>
-
 <div class="stack" >
     <FluentCard class="editor-card">
         <FluentLabel Typography="Typography.Title2">@_activeEntry.Date.ToString("dddd, MMM dd yyyy")</FluentLabel>
@@ -29,12 +31,13 @@
             <FluentTextArea Label="Notes (optional)" Rows="3" Value="@_activeEntry.Notes" ValueChanged="OnNotesChangedAsync" />
         </div>
 
+        <div class="action-row">
         @if (!_autoSaveEnabled)
         {
-            <div class="action-row">
                 <FluentButton Appearance="Appearance.Accent" @onclick="SaveEntryAsync">Save Entry</FluentButton>
-            </div>
         }
+        <FluentButton Appearance="Appearance.Accent" @onclick="DeleteEntryAsync">Delete Entry</FluentButton>
+        </div>
 
         @if (!string.IsNullOrWhiteSpace(_statusMessage))
         {
@@ -170,6 +173,19 @@
         await PersistEntryAsync(isAutoSave: false);
     }
 
+    private async Task DeleteEntryAsync()
+    {
+        var dialog = await DialogService.ShowConfirmationAsync("Are you sure you want to delete this item?");
+        var result = await dialog.Result;
+        if (!result.Cancelled)
+        {
+            await JournalService.DeleteAsync(_activeEntry.Id);
+            await InvokeAsync(StateHasChanged);
+            await LoadTodayAsync();
+        }
+    }
+
+
     private Task OnYesterdayChangedAsync(string? value)
     {
         _activeEntry.Yesterday = value;
@@ -216,7 +232,7 @@
     {
         try
         {
-            await Task.Delay(1200, cancellationToken);
+            //await Task.Delay(1200, cancellationToken);
             await PersistEntryAsync(isAutoSave: true);
         }
         catch (OperationCanceledException)

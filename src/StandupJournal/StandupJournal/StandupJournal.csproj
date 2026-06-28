@@ -69,14 +69,18 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" Version="4.14.3" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.80" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\StandupJournal.Shared\StandupJournal.Shared.csproj" />
     <ProjectReference Include="..\StandupJournal.Infrastructure.Sqlite\StandupJournal.Infrastructure.Sqlite.csproj" />
     <ProjectReference Include="..\StandupJournal.Core\StandupJournal.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="Microsoft.Maui.Controls" Version="10.0.80" />
   </ItemGroup>
 
 </Project>
